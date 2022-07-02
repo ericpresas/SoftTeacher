@@ -1,21 +1,10 @@
 mmdet_base = "../../thirdparty/mmdetection/configs/_base_"
 _base_ = [
-    f"{mmdet_base}/models/faster_rcnn_r50_fpn.py",
+    f"detr_r50_8x2_150e_coco.py",
     f"{mmdet_base}/datasets/coco_detection.py",
     f"{mmdet_base}/schedules/schedule_1x.py",
     f"{mmdet_base}/default_runtime.py",
 ]
-
-model = dict(
-    backbone=dict(
-        norm_cfg=dict(requires_grad=False),
-        norm_eval=True,
-        style="caffe",
-        init_cfg=dict(
-            type="Pretrained", checkpoint="open-mmlab://detectron2/resnet50_caffe"
-        ),
-    )
-)
 
 img_norm_cfg = dict(mean=[103.530, 116.280, 123.675], std=[1.0, 1.0, 1.0], to_rgb=False)
 
@@ -27,7 +16,8 @@ train_pipeline = [
         transforms=[
             dict(
                 type="RandResize",
-                img_scale=[(1333, 400), (1333, 1200)],
+                #img_scale=[(1333, 400), (1333, 1200)],
+                img_scale=[(500, 100), (500, 450)],
                 multiscale_mode="range",
                 keep_ratio=True,
             ),
@@ -77,7 +67,8 @@ strong_pipeline = [
         transforms=[
             dict(
                 type="RandResize",
-                img_scale=[(1333, 400), (1333, 1200)],
+                #img_scale=[(1333, 400), (1333, 1200)],
+                img_scale=[(500, 100), (500, 450)],
                 multiscale_mode="range",
                 keep_ratio=True,
             ),
@@ -150,7 +141,8 @@ weak_pipeline = [
         transforms=[
             dict(
                 type="RandResize",
-                img_scale=[(1333, 400), (1333, 1200)],
+                #img_scale=[(1333, 400), (1333, 1200)],
+                img_scale=[(500, 100), (500, 450)],
                 multiscale_mode="range",
                 keep_ratio=True,
             ),
@@ -210,13 +202,13 @@ data = dict(
         _delete_=True,
         type="SemiDataset",
         sup=dict(
-            type="GrapesDataset",
+            type="CocoDataset",
             ann_file=None,
             img_prefix=None,
             pipeline=train_pipeline,
         ),
         unsup=dict(
-            type="GrapesDataset",
+            type="CocoDataset",
             ann_file=None,
             img_prefix=None,
             pipeline=unsup_pipeline,
@@ -243,7 +235,7 @@ semi_wrapper = dict(
         use_teacher_proposal=False,
         pseudo_label_initial_score_thr=0.5,
         rpn_pseudo_threshold=0.9,
-        cls_pseudo_threshold=0.9,
+        cls_pseudo_threshold=0.7,
         reg_pseudo_threshold=0.02,
         jitter_times=10,
         jitter_scale=0.06,
@@ -259,15 +251,14 @@ custom_hooks = [
     dict(type="MeanTeacher", momentum=0.999, interval=1, warm_up=0),
 ]
 evaluation = dict(type="SubModulesDistEvalHook", interval=4000)
-optimizer = dict(type="SGD", lr=0.01, momentum=0.9, weight_decay=0.0001)
-lr_config = dict(step=[120000, 160000])
-runner = dict(_delete_=True, type="IterBasedRunner", max_iters=180000)
+
+
 checkpoint_config = dict(by_epoch=False, interval=4000, max_keep_ckpts=20)
 
 fp16 = dict(loss_scale="dynamic")
 
 log_config = dict(
-    interval=1,
+    interval=50,
     hooks=[
         dict(type="TextLoggerHook", by_epoch=False),
     ],

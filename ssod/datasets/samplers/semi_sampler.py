@@ -184,11 +184,16 @@ class DistributedGroupSemiBalanceSampler(Sampler):
 
         offset = len(self) * self.rank
         indices = indices[offset : offset + len(self)]
+        print('Indices')
+        print(len(indices))
+        print('Self')
+        print(len(self))
         assert len(indices) == len(self)
         return iter(indices)
 
     def __len__(self):
-        return sum(self.epoch_length) * self.samples_per_gpu
+        return sum(self.epoch_length)
+        #return sum(self.epoch_length) * self.samples_per_gpu
 
     def set_epoch(self, epoch):
         self.epoch = epoch

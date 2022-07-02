@@ -6,14 +6,14 @@ from mmdet.models import DETECTORS, build_detector
 from ssod.utils.structure_utils import dict_split, weighted_loss
 from ssod.utils import log_image_with_boxes, log_every_n
 
-from .multi_stream_detector import MultiSteamDetector
+from .multi_stream_detector_one_stage import MultiSteamDetector
 from .utils import Transform2D, filter_invalid, save_variables_pickle
 
 
 @DETECTORS.register_module()
-class SoftTeacher(MultiSteamDetector):
+class SoftTeacherSingleStage(MultiSteamDetector):
     def __init__(self, model: dict, train_cfg=None, test_cfg=None):
-        super(SoftTeacher, self).__init__(
+        super(SoftTeacherSingleStage, self).__init__(
             dict(teacher=build_detector(model), student=build_detector(model)),
             train_cfg=train_cfg,
             test_cfg=test_cfg,
@@ -203,9 +203,6 @@ class SoftTeacher(MultiSteamDetector):
         log_every_n(
             {"rcnn_cls_gt_num": sum([len(bbox) for bbox in gt_bboxes]) / len(gt_bboxes)}
         )
-
-        print()
-
         sampling_results = self.get_sampling_result(
             img_metas,
             proposal_list,
@@ -244,12 +241,12 @@ class SoftTeacher(MultiSteamDetector):
             *bbox_targets,
             reduction_override="none",
         )
-        """keys_save = ['bbox_results', 'rois', 'bbox_targets']
+        keys_save = ['bbox_results', 'rois', 'bbox_targets']
         variables_save = [bbox_results, rois, bbox_targets]
         try:
             save_variables_pickle(keys_save, variables_save, "/mnt/gpid08/users/eric.presas/TFM/SoftTeacher/debug_variables.pickle")
         except Exception as e:
-            print(e)"""
+            print(e)
 
         loss["loss_cls"] = loss["loss_cls"].sum() / max(bbox_targets[1].sum(), 1.0)
         loss["loss_bbox"] = loss["loss_bbox"].sum() / max(
@@ -356,13 +353,10 @@ class SoftTeacher(MultiSteamDetector):
         return student_info
 
     def extract_teacher_info(self, img, img_metas, proposals=None, **kwargs):
-        print('Extract teacher info ------------------------------------------')
-        print(proposals)
         teacher_info = {}
         feat = self.teacher.extract_feat(img)
         teacher_info["backbone_feature"] = feat
-        if proposals is None:
-            print(self.teacher.train_cfg)
+        """if proposals is None:
             proposal_cfg = self.teacher.train_cfg.get(
                 "rpn_proposal", self.teacher.test_cfg.rpn
             )
@@ -376,7 +370,17 @@ class SoftTeacher(MultiSteamDetector):
 
         proposal_list, proposal_label_list = self.teacher.roi_head.simple_test_bboxes(
             feat, img_metas, proposal_list, self.teacher.test_cfg.rcnn, rescale=False
+        )"""
+
+        proposal_and_label_list = self.teacher.bbox_head.simple_test(
+            feat, img_metas, rescale=False
         )
+
+        proposal_list = []
+        proposal_label_list = []
+        for proposal_and_label in proposal_and_label_list:
+            proposal_list.append(proposal_and_label[0])
+            proposal_label_list.append(proposal_and_label[1])
 
         proposal_list = [p.to(feat[0].device) for p in proposal_list]
         proposal_list = [
@@ -409,7 +413,6 @@ class SoftTeacher(MultiSteamDetector):
         reg_unc = self.compute_uncertainty_with_aug(
             feat, img_metas, proposal_list, proposal_label_list
         )
-        print()
         det_bboxes = [
             torch.cat([bbox, unc], dim=-1) for bbox, unc in zip(det_bboxes, reg_unc)
         ]
@@ -426,22 +429,23 @@ class SoftTeacher(MultiSteamDetector):
     def compute_uncertainty_with_aug(
         self, feat, img_metas, proposal_list, proposal_label_list
     ):
-        print('Aug times', self.train_cfg.jitter_times)
         auged_proposal_list = self.aug_box(
             proposal_list, self.train_cfg.jitter_times, self.train_cfg.jitter_scale
         )
         # flatten
         auged_proposal_list = [
-            auged.reshape(-1, auged.shape[-1]) for auged in auged_proposal_list
+            auged.reshape(-1, auged.shape[-1])[:,:4] for auged in auged_proposal_list
         ]
 
-        bboxes, _ = self.teacher.roi_head.simple_test_bboxes(
+        """bboxes, _ = self.teacher.roi_head.simple_test_bboxes(
             feat,
             img_metas,
             auged_proposal_list,
             None,
             rescale=False,
-        )
+        )"""
+
+        bboxes = auged_proposal_list
 
         reg_channel = max([bbox.shape[-1] for bbox in bboxes]) // 4
         bboxes = [

@@ -25,7 +25,7 @@ import json
 import os
 
 
-def prepare_coco_data(seed=1, percent=10.0, version=2017, seed_offset=0):
+def prepare_coco_data(config, seed=1, percent=10.0, version=2017, seed_offset=0):
     """Prepare COCO dataset for Semi-supervised learning
     Args:
       seed: random seed for dataset split
@@ -43,16 +43,18 @@ def prepare_coco_data(seed=1, percent=10.0, version=2017, seed_offset=0):
         new_anno = {}
         new_anno["images"] = images
         new_anno["annotations"] = annotations
-        new_anno["licenses"] = anno["licenses"]
+        if 'licenses' in anno:
+            new_anno["licenses"] = anno["licenses"]
         new_anno["categories"] = anno["categories"]
-        new_anno["info"] = anno["info"]
-        path = "{}/{}".format(COCOANNODIR, "semi_supervised")
+        if 'info' in anno:
+            new_anno["info"] = anno["info"]
+        path = "{}/{}".format(config.ANNOTATIONS_DIR, "semi_supervised")
         if not os.path.exists(path):
             os.mkdir(path)
 
         with open(
             "{root}/{folder}/{save_name}.json".format(
-                save_name=name, root=COCOANNODIR, folder="semi_supervised"
+                save_name=name, root=config.ANNOTATIONS_DIR, folder="semi_supervised"
             ),
             "w",
         ) as f:
@@ -64,10 +66,9 @@ def prepare_coco_data(seed=1, percent=10.0, version=2017, seed_offset=0):
         )
 
     np.random.seed(seed + seed_offset)
-    COCOANNODIR = os.path.join(DATA_DIR, "annotations")
 
     anno = json.load(
-        open(os.path.join(COCOANNODIR, "instances_train{}.json".format(version)))
+        open(f"{config.ANNOTATIONS_DIR}/{config.ANNOTATIONS_TRAIN}")
     )
 
     image_list = anno["images"]
@@ -106,25 +107,39 @@ def prepare_coco_data(seed=1, percent=10.0, version=2017, seed_offset=0):
     )
     _save_anno(save_name, unlabeled_images, unlabeled_annotations)
     #construct 120k unlabeled data
-    unlabeled_ann_file = os.path.join(COCOANNODIR, "instances_unlabeled{}.json".format(version))
+    unlabeled_ann_file = os.path.join(config.ANNOTATIONS_DIR, "instances_unlabeled{}.json".format(version))
     if not os.path.exists(unlabeled_ann_file):
         unlabeled_info = json.load(
-            open(os.path.join(COCOANNODIR, "image_info_unlabeled{}.json".format(version)))
+            open(f"{config.ANNOTATIONS_DIR}/{config.ANNOTATIONS_UNLABELED}")
         )
         unlabeled_info["annotations"] = []
         unlabeled_info["categories"] = anno["categories"]
         print(">> Data {}.json saved({} images {} annotations)".format(unlabeled_ann_file,len(unlabeled_info["images"]),len(unlabeled_info["annotations"])))
-        json.dump(unlabeled_info,open(os.path.join(COCOANNODIR, "instances_unlabeled{}.json".format(version)),'w'))
+        json.dump(unlabeled_info,open(os.path.join(config.ANNOTATIONS_DIR, "instances_unlabeled{}.json".format(version)),'w'))
+
+
+class Config:
+    DATA_DIR = ""
+    ANNOTATIONS_DIR = ""
+    ANNOTATIONS_TRAIN = ""
+    ANNOTATIONS_UNLABELED = ""
+
 
 if __name__ == "__main__":
-
+    config = Config()
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", type=str)
+    parser.add_argument("--annotations-train", type=str)
+    parser.add_argument("--annotations-unlabeled", type=str)
+    parser.add_argument("--annotations-dir", type=str)
     parser.add_argument("--percent", type=float, default=10)
     parser.add_argument("--version", type=int, default=2017)
     parser.add_argument("--seed", type=int, help="seed", default=1)
     parser.add_argument("--seed-offset", type=int, default=0)
     args = parser.parse_args()
     print(args)
-    DATA_DIR = args.data_dir
-    prepare_coco_data(args.seed, args.percent, args.version, args.seed_offset)
+    config.DATA_DIR = args.data_dir
+    config.ANNOTATIONS_TRAIN = args.annotations_train
+    config.ANNOTATIONS_UNLABELED = args.annotations_unlabeled
+    config.ANNOTATIONS_DIR = args.annotations_dir
+    prepare_coco_data(config, args.seed, args.percent, args.version, args.seed_offset)

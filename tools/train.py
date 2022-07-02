@@ -164,13 +164,16 @@ def main():
     cfg.seed = args.seed
     meta["seed"] = args.seed
     meta["exp_name"] = osp.basename(args.config)
-
+    print(cfg.get("train_cfg"))
     model = build_detector(
         cfg.model, train_cfg=cfg.get("train_cfg"), test_cfg=cfg.get("test_cfg")
     )
     model.init_weights()
 
     datasets = [build_dataset(cfg.data.train)]
+    print()
+    print(f"Workflow------------------------{len(cfg.workflow)}")
+    print()
     if len(cfg.workflow) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)
         val_dataset.pipeline = cfg.data.train.pipeline
@@ -182,6 +185,9 @@ def main():
             mmdet_version=__version__ + get_git_hash()[:7], CLASSES=datasets[0].CLASSES
         )
     # add an attribute for visualization convenience
+    print()
+    print(f"Classes------------------------{datasets[0].CLASSES}")
+    print()
     model.CLASSES = datasets[0].CLASSES
     train_detector(
         model,
