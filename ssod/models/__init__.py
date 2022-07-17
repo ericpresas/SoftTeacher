@@ -1,3 +1,4 @@
 from .soft_teacher import SoftTeacher
 from .soft_teacher_single_stage import SoftTeacherSingleStage
 from .soft_teacher_detr import SoftTeacherDETR
+from .soft_teacher_detr_simple import SoftTeacherDETRSimple
